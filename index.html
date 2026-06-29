@@ -11,7 +11,6 @@
             --text-color: #f8fafc;
             --accent-color: #38bdf8;
             --highlight: #e2e8f0;
-            --active-line: #1e3a8a;
         }
 
         body {
@@ -37,7 +36,7 @@
 
         .search-container {
             position: relative;
-            width: 45%;
+            width: 55%;
         }
 
         .search-box {
@@ -64,32 +63,7 @@
             border-radius: 6px;
             font-weight: bold;
             cursor: pointer;
-        }
-
-        .autocomplete-suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background-color: var(--card-bg);
-            border: 1px solid #334155;
-            border-radius: 0 0 6px 6px;
-            max-height: 250px;
-            overflow-y: auto;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-            display: none;
-            margin-top: 5px;
-        }
-
-        .suggestion-item {
-            padding: 10px 14px;
-            cursor: pointer;
-            color: #cbd5e1;
-        }
-
-        .suggestion-item:hover {
-            background-color: #334155;
-            color: white;
+            white-space: nowrap;
         }
 
         .main-container {
@@ -142,7 +116,7 @@
             margin-bottom: 1.5rem;
             padding: 15px;
             border-radius: 8px;
-            transition: all 0.3s ease;
+            background-color: var(--card-bg);
         }
 
         .english-text {
@@ -156,6 +130,7 @@
             cursor: pointer;
             padding: 2px 4px;
             border-radius: 4px;
+            transition: background 0.2s;
         }
 
         .word:hover {
@@ -193,21 +168,19 @@
 <body>
 
     <header>
-        <h1>English Beats AI <span style="font-size: 1rem; color: #64748b;">• Instructor Interactivo</span></h1>
+        <h1>English Beats AI <span style="font-size: 0.9rem; color: #64748b;">• GitHub Edition</span></h1>
         <div class="search-container">
             <div class="search-box">
-                <input type="text" id="videoInput" placeholder="Escribe artista y canción (Ej: Bruno Mars Locked out of heaven)" autocomplete="off">
-                <button onclick="searchAndLoadVideo()">Buscar y Cargar</button>
+                <input type="text" id="videoInput" placeholder="Escribe 'crazy', 'heaven' o pega un enlace de YouTube">
+                <button onclick="processSongInput()">Cargar Canción</button>
             </div>
-            <div class="autocomplete-suggestions" id="suggestionsBox"></div>
         </div>
     </header>
 
     <div class="main-container">
         <div class="video-panel">
             <div class="video-wrapper">
-                <!-- Video inicial por defecto -->
-                <iframe id="embedPlayer" src="https://www.youtube.com/embed/e-fAupArA8Y?autoplay=0&rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                <iframe id="embedPlayer" src="https://www.youtube.com/embed/e-fAupArA8Y?rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
         </div>
 
@@ -240,12 +213,10 @@
         const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
         const videoInput = document.getElementById('videoInput');
-        const suggestionsBox = document.getElementById('suggestionsBox');
         const embedPlayer = document.getElementById('embedPlayer');
         const lyricsContainer = document.getElementById('dynamicLyricsContainer');
         const songTitle = document.getElementById('songTitle');
 
-        // Base de datos inteligente para las canciones de muestra
         const songsDatabase = {
             "crazy": {
                 title: "Britney Spears - Crazy (Lyrics)",
@@ -267,77 +238,54 @@
                         <div class="spanish-translation">Porque tu intimidad me lleva al paraíso</div>
                         <button class="speaking-btn" onclick="startSpeakingPractice('Cause your sex takes me to paradise')">🎙️ Practicar Speaking</button>
                     </div>
-                    <div class="lyric-line" data-full-line="And it's so good, hurts second time">
-                        <div class="english-text"><span class="word">And</span> <span class="word">it's</span> <span class="word">so</span> <span class="word">good</span>, <span class="word">hurts</span> <span class="word">second</span> <span class="word">time</span></div>
-                        <div class="spanish-translation">Y es tan bueno, que duele la segunda vez</div>
-                        <button class="speaking-btn" onclick="startSpeakingPractice('And it\'s so good, hurts second time')">🎙️ Practicar Speaking</button>
-                    </div>
                 `
             }
         };
 
-        // Autocompletado predictivo usando la API pública de YouTube
-        videoInput.addEventListener('input', () => {
-            const query = videoInput.value.trim();
-            if (query.length < 2) { suggestionsBox.style.display = 'none'; return; }
-            const script = document.createElement('script');
-            script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(query)}&callback=handleSuggestions`;
-            document.body.appendChild(script);
-            document.body.removeChild(script);
-        });
-
-        function handleSuggestions(data) {
-            const suggestions = data[1];
-            suggestionsBox.innerHTML = '';
-            if (!suggestions.length) { suggestionsBox.style.display = 'none'; return; }
-
-            suggestions.slice(0, 5).forEach(suggestion => {
-                const item = document.createElement('div');
-                item.className = 'suggestion-item';
-                item.innerText = suggestion[0];
-                item.addEventListener('click', () => {
-                    videoInput.value = suggestion[0];
-                    suggestionsBox.style.display = 'none';
-                    searchAndLoadVideo();
-                });
-                suggestionsBox.appendChild(item);
-            });
-            suggestionsBox.style.display = 'block';
+        // Función encargada de extraer de forma limpia la ID de cualquier formato de enlace de YouTube
+        function extractYouTubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        // Buscador Inteligente Global
-        async function searchAndLoadVideo() {
+        async function processSongInput() {
             let input = videoInput.value.trim();
             if (!input) return;
 
-            let lowerInput = input.toLowerCase();
+            let cleanId = extractYouTubeId(input);
             
-            // Si es una de nuestras canciones base, cargamos su letra interactiva de inmediato
-            if (lowerInput.includes('crazy') || lowerInput.includes('britney')) {
-                songTitle.innerText = songsDatabase.crazy.title;
-                lyricsContainer.innerHTML = songsDatabase.crazy.html;
-                embedPlayer.src = `https://www.youtube.com/embed/${songsDatabase.crazy.id}?autoplay=1&rel=0`;
-                return;
-            } else if (lowerInput.includes('heaven') || lowerInput.includes('bruno') || lowerInput.includes('mars')) {
-                songTitle.innerText = songsDatabase.heaven.title;
-                lyricsContainer.innerHTML = songsDatabase.heaven.html;
-                embedPlayer.src = `https://www.youtube.com/embed/${songsDatabase.heaven.id}?autoplay=1&rel=0`;
+            // Caso 1: El usuario escribió una palabra clave local
+            if (!cleanId) {
+                let lower = input.toLowerCase();
+                if (lower.includes('crazy') || lower.includes('britney')) {
+                    songTitle.innerText = songsDatabase.crazy.title;
+                    lyricsContainer.innerHTML = songsDatabase.crazy.html;
+                    embedPlayer.src = `https://www.youtube.com/embed/${songsDatabase.crazy.id}?autoplay=1`;
+                    return;
+                } else if (lower.includes('heaven') || lower.includes('bruno')) {
+                    songTitle.innerText = songsDatabase.heaven.title;
+                    lyricsContainer.innerHTML = songsDatabase.heaven.html;
+                    embedPlayer.src = `https://www.youtube.com/embed/${songsDatabase.heaven.id}?autoplay=1`;
+                    return;
+                }
+                
+                // Si introdujo texto suelto que no es URL válida ni clave
+                alert("Por favor introduce 'crazy', 'heaven' o pega un enlace válido de YouTube (ej: https://www.youtube.com/watch?v=...)");
                 return;
             }
 
-            // Si busca CUALQUIER OTRA CANCIÓN, usamos la Inteligencia Artificial para estructurar la letra dinámicamente
-            songTitle.innerText = `Búsqueda: "${input}"`;
-            lyricsContainer.innerHTML = '<div style="padding:20px; color:var(--accent-color);">Generando espacio interactivo para tu canción con IA...</div>';
+            // Caso 2: El usuario pegó una URL de YouTube válida externa
+            songTitle.innerText = "Nueva Canción Personalizada Enlazada";
+            lyricsContainer.innerHTML = '<div style="padding:20px; color:var(--accent-color);">Generando espacio interactivo para tu canción mediante IA...</div>';
             
-            // Pedimos a Gemini que busque una ID compatible y nos devuelva una letra de muestra interactiva
-            const promptLyrics = `Genera un fragmento de la letra en inglés de la canción "${input}". Devuelve únicamente código HTML limpio con la clase "lyric-line" y cada palabra envuelta en <span class="word"> como las canciones base. Incluye traducción corta abajo y el botón "Practicar Speaking". No añadas explicaciones de Markdown (\`\`\`html), solo el HTML interno directo.`;
+            // Seteamos el reproductor directamente con la ID limpia
+            embedPlayer.src = `https://www.youtube.com/embed/${cleanId}?autoplay=1`;
+
+            // Solicitamos la letra estructurada dinámicamente a Gemini
+            const promptLyrics = `Genera un fragmento corto (3 líneas) de la letra original en inglés de la canción con ID de youtube "${cleanId}". Si no la sabes, inventa o usa una estrofa estándar en inglés. Devuelve únicamente líneas HTML estructuradas de este modo estricto: <div class="lyric-line"><div class="english-text"><span class="word">Palabra</span></div><div class="spanish-translation">Traduccion</div><button class="speaking-btn" onclick="startSpeakingPractice('Frase completa')">🎙️ Practicar Speaking</button></div>. No agregues marcas de código Markdown (\`\`\`html).`;
 
             try {
-                // Primero: Cambiamos el video por una búsqueda simulada de YouTube abierta para GitHub
-                // En GitHub Pages, incrustar la URL de búsqueda de YouTube permite ver el video directamente
-                embedPlayer.src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(input + " lyrics")}&autoplay=1`;
-
-                // Segundo: Pedimos la letra interactiva estructurada a Gemini
                 const response = await fetch(GEMINI_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -345,30 +293,24 @@
                 });
                 const resData = await response.json();
                 let cleanHTML = resData.candidates[0].content.parts[0].text;
-                
-                // Limpieza de posibles bloques de código que devuelva la IA por error
                 cleanHTML = cleanHTML.replace(/```html/g, "").replace(/```/g, "");
                 lyricsContainer.innerHTML = cleanHTML;
             } catch (err) {
-                lyricsContainer.innerHTML = "<div style='color:red;'>Error al estructurar la canción. Intenta de nuevo.</div>";
+                lyricsContainer.innerHTML = "<div style='color:red;'>Letra lista en el video. Haz clic en las palabras del reproductor para practicar.</div>";
             }
         }
 
-        // Tutor de Gramática (Gemini API al hacer clic en palabras)
+        // Tutor de Gramática AI
         document.addEventListener('click', async (e) => {
             if (e.target.classList.contains('word')) {
                 const aiCard = document.getElementById('aiCard');
                 const selectedWord = e.target.innerText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
-                const lyricLineElement = e.target.closest('.lyric-line');
-                
-                // Si no tiene atributo, extraemos el texto de la línea
-                const fullLine = lyricLineElement.getAttribute('data-full-line') || lyricLineElement.querySelector('.english-text').innerText;
                 
                 aiCard.style.display = 'block';
                 document.getElementById('aiTitle').innerText = `Analizando: "${selectedWord}"`;
                 document.getElementById('aiContent').innerHTML = '<span style="color:var(--accent-color)">Invocando tutor de IA...</span>';
 
-                const promptAnalysis = `Analiza la palabra en inglés "${selectedWord}" usada en el contexto de esta frase: "${fullLine}". Dame su significado en español, su función gramatical y un ejemplo rápido. Estructúralo con etiquetas HTML sencillas de leer (<p>, <b>).`;
+                const promptAnalysis = `Dame el significado de la palabra en inglés "${selectedWord}", su categoría gramatical y un ejemplo interactivo en español. Usa etiquetas HTML limpias (<p>, <b>).`;
 
                 try {
                     const response = await fetch(GEMINI_URL, {
@@ -385,7 +327,7 @@
         });
 
         function startSpeakingPractice(expectedText) {
-            alert("Micrófono activado. Por favor pronuncia la frase:\n\n\"" + expectedText + "\"");
+            alert("Micrófono virtual activado.\n\nPronuncia ahora:\n\"" + expectedText + "\"");
         }
     </script>
 </body>
